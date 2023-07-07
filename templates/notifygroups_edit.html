@@ -1,0 +1,52 @@
+{{ define "editnotifygroup" }}
+{{ template "Header" . }}
+<form id="mform" action="notifygroup" method="POST">
+    <input type="number" name="id" value="{{.NotifyGroup.Id}}" style="display:none;">
+    <input type="text" name="name" value="{{.NotifyGroup.Name}}" placeholder="name"><br>
+    <input type="text" name="gotifyurl" value="{{.NotifyGroup.Gotifyurl}}" placeholder="https://example.com/gotify/"><br>
+    <input type="text" name="gotifykey" value="{{.NotifyGroup.Gotifykey}}" placeholder="2u09fasg"><br>
+    <input type="text" name="emailaddresses" value="{{.NotifyGroup.Emailaddresses}}" placeholder="email1;email2;email3"><br>
+    <input type="text" name="webhookurl" value="{{.NotifyGroup.Webhookurl}}" placeholder="https://discord.com/api/webhooks/abc123DEF"><br>
+    <input type="checkbox" name="shouldemail" {{if .NotifyGroup.Shouldemail}}checked{{end}}>
+    <label for="shouldemail">Should Notify via eMail</label><br>
+    <input type="checkbox" name="shouldgotify" {{if .NotifyGroup.Shouldgotify}}checked{{end}}>
+    <label for="shouldgotify">Should Notify via Gotify</label><br>
+    <input type="checkbox" name="shouldwebhook" {{if .NotifyGroup.Shouldwebhook}}checked{{end}}>
+    <label for="shouldwebhook">Should Notify via Webhook</label><br>
+
+    <input type="submit" value="Save">
+</form>
+<script>
+document.getElementById("mform").addEventListener("submit",function(ev){
+    ev.preventDefault();
+    SendNotifygroup();
+    //console.log(ev);
+    //alert("submit!");
+});
+function SendNotifygroup() {
+    var xhr = new XMLHttpRequest();
+    var url = "notifygroup";
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function(){
+        if(xhr.readyState === 4){
+            window.location.replace("notifygroups");
+        }
+    };
+    var data = {
+        "name": document.getElementsByName("name")[0].value,
+        "gotifyurl": document.getElementsByName("gotifyurl")[0].value,
+        "gotifykey": document.getElementsByName("gotifykey")[0].value,
+        "emailaddresses": document.getElementsByName("emailaddresses")[0].value,
+        "webhookurl": document.getElementsByName("webhookurl")[0].value,
+        "shouldemail": document.getElementsByName("shouldemail")[0].checked,
+        "shouldgotify": document.getElementsByName("shouldgotify")[0].checked,
+        "shouldwebhook": document.getElementsByName("shouldwebhook")[0].checked,
+    };
+    console.log(data);
+    var jdata = JSON.stringify(data);
+    xhr.send(jdata);
+}
+</script>
+{{ template "Footer" }}
+{{end}}

@@ -1,0 +1,106 @@
+{{ define "Header" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{{.Title}}</title>
+<link rel="icon" type="image/png" href="assets/icon.png">
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    font-family: Verdana, Arial;
+    background: #333333;
+    font-size: 1.1em;
+    line-height: 1.5em;
+    color: #cfcfcf;
+  }
+  span{
+    font-family: monospace;
+    background-color:#F0F0F0;
+    background-color:black;
+    color:white;
+  }
+  h1, h2, h3, h4, h5, h6 {
+     color: #FFFFFF;
+  }
+  a{
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .dash {
+    display:inline-block;
+    margin:2px;
+    padding:10px;
+  }
+  .dashlink {
+    margin: 10px;
+  }
+  .dashlink:hover {
+    background: #FFFFFF;
+  }
+  
+  #sidebar {
+    background: #1d1d1d;
+    height:45px;
+  }
+  #sidebar img {
+    height:45px;
+    float:left;
+  }
+  #sidebar a {
+    padding: 10px;
+  }
+  #sidebar a:hover {
+    color: black;
+    background-color: GhostWhite;
+  }
+  
+  #main {
+    margin: 0 auto;
+    max-width: 1200px;
+    padding: 40px;
+  }
+  table{
+    border-collapse: collapse;
+  }
+  tr{
+    border-bottom: 1px solid black;
+  }
+  tr:last-child{
+    border-bottom:none;
+  }
+  td, th {
+    padding: 0 15px;
+  }
+  
+  //Mobile
+  // Class 'nm' stands for 'no mobile' => content that is hidden on mobile
+  
+  @media only screen and (max-width: 768px) {
+    .nm{display:none;}
+    #main{margin-left:0px;padding:5px;}
+    
+    // Fix navbar
+    #sidebar {height:auto;}
+    #sidebar a {padding: 5px;}
+    #sidebar img {width:100%;height:auto;}
+    
+    // Fix home list
+    .dash {
+        display: block;
+        margin: 0;
+        padding: 0;
+    }
+    .dashlink { display: initial; margin: 0; }
+    
+    //History
+    td, th { padding: 0 5px; }
+  }
+</style>
+</head>
+<body>
+{{ template "Navbar" }}
+<div id="main">
+    <h1>{{.Title}}</h1>
+{{end}}

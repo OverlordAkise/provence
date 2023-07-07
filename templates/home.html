@@ -1,0 +1,18 @@
+{{ define "home" }}
+{{ template "Header" . }}
+
+{{range $grp, $liste := .Overview}}
+<div id="{{$grp}}">
+<h2>{{$grp}}</h2>
+{{range $k, $ov := $liste}}
+    <a class="dashlink" href="history?name={{$ov.Name}}">
+    <div class="dash" style="background-color:{{if $ov.Success}}springgreen{{else if $ov.Found}}orangered{{else}}silver{{end}};">
+        <h3>{{$ov.Name}}</h3>
+        <p>{{$ov.Err}}</p>
+    </div>
+    </a>
+{{end}}
+</div>
+{{end}}
+{{ template "Footer" }}
+{{end}}

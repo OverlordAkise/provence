@@ -1,0 +1,16 @@
+{{ define "history" }}
+{{ template "Header" . }}
+<h2>{{.Name}}</h2>
+<table>
+<tr><th>Success</th><th>Datetime</th><th>Output</th></tr>
+{{range $k, $v := .History}}
+    <tr>
+        <td>{{$v.Success}}</td>
+        <td>{{$v.Created}}</td>
+        <td>{{if $v.Success}}{{$v.Output}}{{else}}{{$v.Err}}{{end}}</td>
+    </tr>
+{{end}}
+</table>
+<a href="editjob?name={{.Name}}"><button>edit this cronjob</button></a>
+{{ template "Footer" }}
+{{end}}

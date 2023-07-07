@@ -1,0 +1,99 @@
+{{ define "editjob" }}
+{{ template "Header" . }}
+<form id="mform" action="job" method="POST">
+    <input type="checkbox" name="active" {{if .Cronjob.Active}}checked{{end}}>
+    <label for="active">Is Active?</label>
+    <br>
+    <input type="number" name="id" value="{{.Cronjob.Id}}" style="display:none;">
+    <input type="number" name="entryid" value="{{.Cronjob.EntryId}}" style="display:none;">
+    <input type="text" name="name" value="{{.Cronjob.Name}}" placeholder="name"><br>
+    <textarea style="width:200px;" rows=1 name="desc" form="mform" placeholder="description">{{.Cronjob.Desc}}</textarea><br>
+    <input type="text" name="group" value="{{.Cronjob.Group}}" placeholder="group"><br>
+    <input type="text" name="schedule" value="{{.Cronjob.Schedule}}" placeholder="* * * * *"><br>
+    <textarea id="bash" style="width:350px;" rows=6 name="bash" form="mform" placeholder="echo 'I AM WORKING'">{{.Cronjob.Bash}}</textarea><br>
+    <button id="testbtn">Test Script</button><br>
+    Test-Code: <span id="retcode"></span><br>
+    Test-Message: <span id="retmsg"></span><br>
+    <br>
+    <input type="number" name="failsneeded" value="{{.Cronjob.FailsNeeded}}" placeholder="failsneeded"><br>
+    <input type="number" name="repeatnotifevery" value="{{.Cronjob.RepeatNotifEvery}}" placeholder="repeatNotificationEvery"><br>
+    
+    <label for="notifygroup">Notifygroup:</label>
+    <select name="notifygroup">
+        {{range $k, $v := .NotifyGroups}}
+            <option id="{{$v.Name}}" value="{{$v.Name}}">{{$v.Name}}</option>
+        {{end}}
+    </select>
+    <br>
+    <input type="checkbox" name="alwaysnotify" {{if .Cronjob.AlwaysNotify}}checked{{end}}>
+    <label for="alwaysnotify">Always notify?</label>
+    <br>
+    <input type="submit" value="Save">
+</form>
+<script>
+let curgroup = {{ .Cronjob.NotifyGroup }};
+let options = document.getElementsByTagName("option");
+for(let i=0;i<options.length;i++){
+    let opt = options[i];
+    if(opt.id == curgroup){
+        opt.selected = true;
+        break;
+    }
+}
+
+document.getElementById("testbtn").addEventListener("click",function(ev){
+    ev.preventDefault();
+    sendRequest();
+});
+function sendRequest() {
+    var xhr = new XMLHttpRequest();
+    var url = "testbash";
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+            document.getElementById("retcode").innerText = xhr.status;
+            document.getElementById("retmsg").innerText = xhr.responseText;
+        }
+    };
+    var data = JSON.stringify({"bash": document.getElementById("bash").value});
+    xhr.send(data);
+}
+
+document.getElementById("mform").addEventListener("submit",function(ev){
+    ev.preventDefault();
+    SendJob();
+    //console.log(ev);
+    //alert("submit!");
+});
+function SendJob() {
+    var xhr = new XMLHttpRequest();
+    var url = "job";
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function(){
+        if(xhr.readyState === 4){
+            //window.location.replace("jobs");
+        }
+    };
+    var data = {
+        "active": document.getElementsByName("active")[0].checked,
+        "id": parseFloat(document.getElementsByName("id")[0].value),
+        "entryid": parseFloat(document.getElementsByName("entryid")[0].value),
+        "name": document.getElementsByName("name")[0].value,
+        "desc": document.getElementsByName("desc")[0].value,
+        "group": document.getElementsByName("group")[0].value,
+        "schedule": document.getElementsByName("schedule")[0].value,
+        "bash": document.getElementsByName("bash")[0].value,
+        "failsneeded": parseFloat(document.getElementsByName("failsneeded")[0].value),
+        "repeatnotifevery": parseFloat(document.getElementsByName("repeatnotifevery")[0].value),
+        "notifygroup": document.getElementsByName("notifygroup")[0].value,
+        "alwaysnotify": document.getElementsByName("alwaysnotify")[0].checked,
+    };
+    console.log(data);
+    var jdata = JSON.stringify(data);
+    xhr.send(jdata);
+}
+</script>
+{{ template "Footer" }}
+{{end}}
