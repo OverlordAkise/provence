@@ -77,19 +77,19 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 	return nil
 }
 
-func DeleteCronjob(dj structs.DeleteStruct, c *cron.Cron) error {
-	err := Db.DeleteCronjob(dj)
+func DeleteCronjob(name string, c *cron.Cron) error {
+	err := Db.DeleteCronjob(name)
 	if err != nil {
 		return err
 	}
-	eid, eidExists := CronJobNames[dj.Name]
+	eid, eidExists := CronJobNames[name]
 	if !eidExists {
 		return fmt.Errorf("Cronjob for deletion not found in CronJobNames! Impossible to delete!")
 	}
 	c.Remove(cron.EntryID(eid.EntryId))
-	delete(CronJobNames, dj.Name)
-	delete(CronJobLogLast, dj.Name)
-	logger.Infow("cronjob deleted", "name", dj.Name, "id", eid.EntryId)
+	delete(CronJobNames, name)
+	delete(CronJobLogLast, name)
+	logger.Infow("cronjob deleted", "name", name, "id", eid.EntryId)
 	return nil
 }
 
@@ -529,36 +529,36 @@ func main() {
 		c.Redirect(302, config.Host+"jobs")
 	})
 
-	app.POST("/deletejob", func(c *gin.Context) {
-		dj := new(structs.DeleteStruct)
-		if err := c.ShouldBind(dj); err != nil {
-			logger.Errorw("/deletejob bind error", "err", err)
-			c.String(500, err.Error())
+	app.GET("/deletejob", func(c *gin.Context) {
+		aname := c.DefaultQuery("name", "")
+		if aname == "" {
+			logger.Errorw("/deletejob missing name")
+			c.String(500, "Missing name parameter!")
 			return
 		}
-		err := DeleteCronjob(*dj, cr)
+		err := DeleteCronjob(aname, cr)
 		if err != nil {
-			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", dj.Name, "err", err)
+			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", aname, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		c.String(200, "OK")
+		c.Redirect(302, config.Host+"jobs")
 	})
 
-	app.POST("/deletenotifygroup", func(c *gin.Context) {
-		dn := new(structs.DeleteStruct)
-		if err := c.ShouldBind(dn); err != nil {
-			logger.Errorw("/deletenotifygroup bind error", "err", err)
-			c.String(500, err.Error())
+	app.GET("/deletenotifygroup", func(c *gin.Context) {
+		aname := c.DefaultQuery("name", "")
+		if aname == "" {
+			logger.Errorw("/deletenotifygroup missing name")
+			c.String(500, "Missing name parameter!")
 			return
 		}
-		err := Db.DeleteNotifygroup(*dn)
+		err := Db.DeleteNotifygroup(aname)
 		if err != nil {
-			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", dn.Name, "err", err)
+			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", aname, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		c.String(200, "OK")
+		c.Redirect(302, config.Host+"notifygroups")
 	})
 
 	app.POST("/testbash", func(c *gin.Context) {

@@ -91,19 +91,19 @@ func AddCronjobLog(cjl structs.CronJobLog) error {
 	return err
 }
 
-func DeleteCronjob(dj structs.DeleteStruct) error {
-	_, err := db.NamedExec("DELETE FROM cronjob WHERE name = :name", dj)
+func DeleteCronjob(name string) error {
+	_, err := db.Exec("DELETE FROM cronjob WHERE name = ?", name)
 	return err
 }
 
 func SetCronjobStatus(name string, shouldBeActive bool) error {
-    if shouldBeActive {
-        _, err := db.Exec("UPDATE cronjob SET active = true WHERE name = ?", name)
-        return err
-    }else{
-        _, err := db.Exec("UPDATE cronjob SET active = false WHERE name = ?", name)
-        return err
-    }
+	if shouldBeActive {
+		_, err := db.Exec("UPDATE cronjob SET active = true WHERE name = ?", name)
+		return err
+	} else {
+		_, err := db.Exec("UPDATE cronjob SET active = false WHERE name = ?", name)
+		return err
+	}
 }
 
 func AddNotifygroup(ng structs.NotifyGroup) error {
@@ -111,7 +111,7 @@ func AddNotifygroup(ng structs.NotifyGroup) error {
 	return err
 }
 
-func DeleteNotifygroup(ng structs.DeleteStruct) error {
-	_, err := db.NamedExec("DELETE FROM notifygroup WHERE name = :name", ng)
+func DeleteNotifygroup(name string) error {
+	_, err := db.Exec("DELETE FROM notifygroup WHERE name = ?", name)
 	return err
 }

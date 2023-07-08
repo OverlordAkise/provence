@@ -20,7 +20,7 @@
         <td class="nm">{{$v.NotifyGroup}}</td>
         <td class="nm"><a{{if $v.Active}} href="setinactive?name={{$v.Name}}"><button>deactivate</button></a>{{else}} href="setactive?name={{$v.Name}}"><button>activate</button></a>{{end}}</td>
         <td><a href="editjob?name={{$v.Name}}"><button>edit</button></a></td>
-        <td><button class="deletebtn" jname="{{$v.Name}}">delete</button></td>
+        <td><a href="deletejob?name={{$v.Name}}" class="deletebtn"><button>delete</button></a></td>
     </tr>
 {{end}}
 </table>
@@ -35,19 +35,7 @@ for(let i=0;i<els.length;i++){
         if (!conf) {
             return;
         }
-        let name = this.getAttribute("jname");
-        
-        var xhr = new XMLHttpRequest();
-        var url = "deletejob";
-        xhr.open("POST", url, true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4 && xhr.status == 200) {
-                window.location.reload()
-            }
-        };
-        var data = JSON.stringify({"name": name});
-        xhr.send(data);
+        window.location = this.href;
         
     });
 }

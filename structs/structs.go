@@ -25,10 +25,6 @@ type CronJobLog struct {
 	Created string `db:"created" json:"created" form:"created"`
 }
 
-type DeleteStruct struct {
-	Name string `form:"name" json:"name" xml:"name"`
-}
-
 type NotifyGroup struct {
 	Id             int    `db:"id" json:"id" form:"id"`
 	Name           string `db:"name" json:"name" form:"name"`
