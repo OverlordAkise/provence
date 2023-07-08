@@ -96,14 +96,14 @@ func DeleteCronjob(dj structs.DeleteStruct) error {
 	return err
 }
 
-func SetCronjobActive(ds structs.DeleteStruct) error {
-	_, err := db.NamedExec("UPDATE cronjob SET active = true WHERE name = :name", ds)
-	return err
-}
-
-func SetCronjobInactive(ds structs.DeleteStruct) error {
-	_, err := db.NamedExec("UPDATE cronjob SET active = false WHERE name = :name", ds)
-	return err
+func SetCronjobStatus(ds structs.DeleteStruct, shouldBeActive bool) error {
+    if shouldBeActive {
+        _, err := db.NamedExec("UPDATE cronjob SET active = true WHERE name = :name", ds)
+        return err
+    }else{
+        _, err := db.NamedExec("UPDATE cronjob SET active = false WHERE name = :name", ds)
+        return err
+    }
 }
 
 func AddNotifygroup(ng structs.NotifyGroup) error {
