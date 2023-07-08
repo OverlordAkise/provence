@@ -34,6 +34,8 @@ import (
 	"github.com/zitadel/oidc/v2/pkg/oidc"
 	//webhooks
 	"encoding/json"
+    //rate limit
+    "sync"
 )
 
 var (
@@ -412,7 +414,29 @@ func main() {
 				"Title": "Provence | Login",
 			})
 		})
+        
+        var ratemap sync.Map
+        var ratereset int64 = 0
 		app.POST("/login", func(c *gin.Context) {
+            // poor-mans ratelimit, 1req/s, clear every 1min
+            ip := c.ClientIP()
+            curtime := time.Now().Unix()
+            t, found := ratemap.Load(ip)
+            if found {
+                if t.(int64) > curtime-1 {
+                    c.String(429,"too many requests")
+                    return
+                }
+            }
+            ratemap.Store(ip,curtime)
+            if ratereset < curtime-60 {
+                ratereset = curtime
+                ratemap.Range(func(key, value interface{}) bool {
+                    ratemap.Delete(key)
+                    return true
+                })
+            }
+            //login logic
 			u := new(structs.User)
 			if err := c.ShouldBind(u); err != nil {
 				logger.Errorw("/login bind error", "err", err)
