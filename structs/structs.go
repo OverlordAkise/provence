@@ -48,19 +48,13 @@ type Config struct {
 	Historylength int    `json:"historylength"`
 	Webuser       string `json:"webuser"`
 	Webpass       string `json:"webpass"`
+	CookieSecret  string `json:"cookiesecret"`
 	Mailfrom      string `json:"mailfrom"`
 	Mailpass      string `json:"mailpass"`
 	Mailhost      string `json:"mailhost"`
 	Mailport      string `json:"mailport"`
 	Listenport    string `json:"listenport"`
 	Host          string `json:"host"`
-
-	UseOidc        bool   `json:"useoidc"`
-	ClientID       string `json:"clientid"`
-	ClientSecret   string `json:"clientsecret"`
-	Issuer         string `json:"issuer"`
-	OidcCookieKey  string `json:"oidccookiekey"`
-	OidcSessionKey string `json:"sessioncookiekey"`
 }
 
 type User struct {

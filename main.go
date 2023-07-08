@@ -1,6 +1,7 @@
 package main
 
 import (
+	//web and cron
 	"bytes"
 	"fmt"
 	"github.com/gin-contrib/sessions"
@@ -26,28 +27,11 @@ import (
 	"embed"
 	"html/template"
 	"io/fs"
-	//oidc support
-	"context"
-	"github.com/google/uuid"
-	"github.com/zitadel/oidc/v2/pkg/client/rp"
-	httphelper "github.com/zitadel/oidc/v2/pkg/http"
-	"github.com/zitadel/oidc/v2/pkg/oidc"
 	//webhooks
 	"encoding/json"
-    //rate limit
-    "sync"
+	//rate limit
+	"sync"
 )
-
-var (
-	callbackPath = "auth/callback"
-)
-
-func WrapF(f http.HandlerFunc) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		newCtx := context.WithValue(c.Request.Context(), "session", c)
-		f(c.Writer, c.Request.WithContext(newCtx))
-	}
-}
 
 func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) error {
 	if cj.EntryId != 0 {
@@ -296,32 +280,6 @@ func main() {
 	cr.Start()
 	fmt.Println("started cron")
 
-	//oidc
-	state := func() string {
-		a := uuid.New().String()
-		//fmt.Println("New UUID:",a)
-		return a
-	}
-	var provider rp.RelyingParty
-	if config.UseOidc {
-		redirectURI := config.Host + callbackPath
-		scopes := strings.Split("email openid", " ")
-		key := []byte(config.OidcCookieKey)
-		cookieHandler := httphelper.NewCookieHandler(key, key, httphelper.WithUnsecure())
-		options := []rp.Option{
-			rp.WithCookieHandler(cookieHandler),
-			rp.WithVerifierOpts(rp.WithIssuedAtOffset(5 * time.Second)),
-		}
-		if config.ClientSecret == "" {
-			options = append(options, rp.WithPKCE(cookieHandler))
-		}
-		var err error
-		provider, err = rp.NewRelyingPartyOIDC(config.Issuer, config.ClientID, config.ClientSecret, redirectURI, scopes, options...)
-		if err != nil {
-			panic("error creating keycloak provider " + err.Error())
-		}
-	}
-
 	//Webserver
 	gin.SetMode(gin.ReleaseMode)
 	app := gin.New()
@@ -332,7 +290,7 @@ func main() {
 	templ := template.Must(template.ParseFS(templates, "templates/*"))
 	app.SetHTMLTemplate(templ)
 
-	store := cookie.NewStore([]byte(config.OidcCookieKey))
+	store := cookie.NewStore([]byte(config.CookieSecret))
 	app.Use(sessions.Sessions("provencesession", store))
 
 	//app.Static("/assets", "./web_res")
@@ -342,125 +300,78 @@ func main() {
 	}
 	app.StaticFS("/assets", http.FS(assetsFS))
 
-	if config.UseOidc {
-		app.Use(func(c *gin.Context) {
-			s := sessions.Default(c)
-			name := s.Get("name")
-			//fmt.Println(c.FullPath(),"Name:",name)
-			if c.FullPath() == "/"+callbackPath {
-				return
-			}
-			if c.FullPath() == "/login" {
-				return
-			}
-
-			if name == nil {
-				c.Redirect(307, config.Host+"login")
-				c.Abort()
-			}
-		})
-	} else {
-		app.Use(func(c *gin.Context) {
-			if c.FullPath() == "/login" || c.FullPath() == "/favicon.ico" {
-				c.Next()
-				return
-			}
-			session := sessions.Default(c)
-			if session.Get("name") == nil || session.Get("name") == "" {
-				c.Redirect(307, config.Host+"login")
-				return
-			}
+	app.Use(func(c *gin.Context) {
+		if c.FullPath() == "/login" || c.FullPath() == "/favicon.ico" {
 			c.Next()
-		})
-	}
-
-	if config.UseOidc {
-		app.GET("/login", gin.WrapF(rp.AuthURLHandler(state, provider)))
-		app.GET("/logout", func(c *gin.Context) {
-			s := sessions.Default(c)
-			idt := s.Get("idtoken").(string)
-			_, err := rp.EndSession(provider, idt, config.Host+"loggedout", "")
-			if err != nil {
-				c.String(500, "ERROR during oidc logout!")
-				fmt.Println(err)
-				return
-			}
-			s.Clear()
-			err = s.Save()
-			if err != nil {
-				c.String(500, "ERROR during session save!")
-				fmt.Println(err)
-				return
-			}
-			c.Redirect(301, config.Host+"loggedout")
-		})
-		setSessionFunc := func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty, info *oidc.UserInfo) {
-			c := r.Context().Value("session").(*gin.Context)
-			s := sessions.Default(c)
-			s.Set("name", info.UserInfoProfile.PreferredUsername)
-			s.Set("idtoken", tokens.IDToken)
-			s.Save()
-			http.Redirect(w, r, config.Host+"home", 301)
+			return
 		}
-		app.GET(callbackPath, WrapF(rp.CodeExchangeHandler(rp.UserinfoCallback(setSessionFunc), provider)))
-	} else {
-		app.GET("/login", func(c *gin.Context) {
-			session := sessions.Default(c)
-			if session.Get("name") != nil {
-				c.Redirect(302, config.Host+"home")
-				return
-			}
-			c.HTML(200, "login", gin.H{
-				"Title": "Provence | Login",
-			})
-		})
-        
-        var ratemap sync.Map
-        var ratereset int64 = 0
-		app.POST("/login", func(c *gin.Context) {
-            // poor-mans ratelimit, 1req/s, clear every 1min
-            ip := c.ClientIP()
-            curtime := time.Now().Unix()
-            t, found := ratemap.Load(ip)
-            if found {
-                if t.(int64) > curtime-1 {
-                    c.String(429,"too many requests")
-                    return
-                }
-            }
-            ratemap.Store(ip,curtime)
-            if ratereset < curtime-60 {
-                ratereset = curtime
-                ratemap.Range(func(key, value interface{}) bool {
-                    ratemap.Delete(key)
-                    return true
-                })
-            }
-            //login logic
-			u := new(structs.User)
-			if err := c.ShouldBind(u); err != nil {
-				logger.Errorw("/login bind error", "err", err)
-				c.Redirect(302, config.Host+"login")
-				return
-			}
-			sess := sessions.Default(c)
-			if u.Name != config.Webuser || u.Pw != config.Webpass {
-				logger.Errorw("wrong login", "name", u.Name, "pw", u.Pw)
-				c.Redirect(302, config.Host+"login")
-				return
-			}
-			sess.Set("name", u.Name)
-			sess.Save()
-			c.Redirect(302, config.Host+"home")
-		})
+		session := sessions.Default(c)
+		if session.Get("name") == nil || session.Get("name") == "" {
+			c.Redirect(307, config.Host+"login")
+			return
+		}
+		c.Next()
+	})
 
-		app.GET("/logout", func(c *gin.Context) {
-			sess := sessions.Default(c)
-			sess.Clear()
-			sess.Save()
+	app.GET("/login", func(c *gin.Context) {
+		session := sessions.Default(c)
+		if session.Get("name") != nil {
 			c.Redirect(302, config.Host+"home")
+			return
+		}
+		c.HTML(200, "login", gin.H{
+			"Title": "Provence | Login",
 		})
-	}
+	})
+
+	var ratemap sync.Map
+	var ratereset int64 = 0
+	app.POST("/login", func(c *gin.Context) {
+		// poor-mans ratelimit, 1req/s, clear every 1min
+		ip := c.ClientIP()
+		curtime := time.Now().Unix()
+		t, found := ratemap.Load(ip)
+		if found {
+			if t.(int64) > curtime-1 {
+				c.String(429, "too many requests")
+				return
+			}
+		}
+		ratemap.Store(ip, curtime)
+		if ratereset < curtime-60 {
+			ratereset = curtime
+			ratemap.Range(func(key, value interface{}) bool {
+				ratemap.Delete(key)
+				return true
+			})
+		}
+		//login logic
+		u := new(structs.User)
+		if err := c.ShouldBind(u); err != nil {
+			logger.Errorw("/login bind error", "err", err)
+			c.Redirect(302, config.Host+"login")
+			return
+		}
+		sess := sessions.Default(c)
+		if u.Name != config.Webuser || u.Pw != config.Webpass {
+			logger.Errorw("wrong login", "name", u.Name, "pw", u.Pw)
+			c.Redirect(302, config.Host+"login")
+			return
+		}
+		sess.Set("name", u.Name)
+		sess.Options(sessions.Options{
+			MaxAge: 3600 * 12, // 12hrs
+		})
+		sess.Save()
+		c.Redirect(302, config.Host+"home")
+	})
+
+	app.GET("/logout", func(c *gin.Context) {
+		sess := sessions.Default(c)
+		sess.Clear()
+		sess.Save()
+		c.Redirect(302, config.Host+"home")
+	})
 
 	// Routes
 	app.GET("/", func(c *gin.Context) {
@@ -686,7 +597,7 @@ func main() {
 		AddCronjobStruct(cj, cr, false)
 		GetCronjobLog(cj.Name)
 		//save to db that its active again
-		err = Db.SetCronjobStatus(structs.DeleteStruct{aname},true)
+		err = Db.SetCronjobStatus(structs.DeleteStruct{aname}, true)
 		if err != nil {
 			logger.Errorw("/setactive db error", "func", "SetCronjobActive", "name", aname, "err", err)
 			c.String(500, err.Error())
@@ -706,7 +617,7 @@ func main() {
 		cr.Remove(cron.EntryID(cj.EntryId))
 		//delete(CronJobNames, cj.Name)
 		//save to db that its active again
-		err := Db.SetCronjobStatus(structs.DeleteStruct{aname},false)
+		err := Db.SetCronjobStatus(structs.DeleteStruct{aname}, false)
 		if err != nil {
 			logger.Errorw("/setinactive db error", "func", "SetCronjobInactive", "name", aname, "err", err)
 			c.String(500, err.Error())

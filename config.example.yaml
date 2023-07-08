@@ -5,6 +5,7 @@ historylength: 100
 # web panel access
 webuser: admin
 webpass: admin
+cookiesecret: secretsecret
 # mail config
 mailfrom: user@example.com
 mailpass: mypassworthere
@@ -12,10 +13,3 @@ mailhost: gmail.org
 mailport: 587
 # for url redirecting, set this to root url of web path
 host: http://localhost:7070/
-# oidc
-useoidc: false
-clientid: myclient
-clientsecret: MYCL1ENTSECRETHERE
-issuer: http://localhost:8080/realms/myrealm
-oidccookiekey: chng1234chng1234
-sessioncookiekey: chng1234chng1234
