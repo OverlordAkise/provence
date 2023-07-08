@@ -96,12 +96,12 @@ func DeleteCronjob(dj structs.DeleteStruct) error {
 	return err
 }
 
-func SetCronjobStatus(ds structs.DeleteStruct, shouldBeActive bool) error {
+func SetCronjobStatus(name string, shouldBeActive bool) error {
     if shouldBeActive {
-        _, err := db.NamedExec("UPDATE cronjob SET active = true WHERE name = :name", ds)
+        _, err := db.Exec("UPDATE cronjob SET active = true WHERE name = ?", name)
         return err
     }else{
-        _, err := db.NamedExec("UPDATE cronjob SET active = false WHERE name = :name", ds)
+        _, err := db.Exec("UPDATE cronjob SET active = false WHERE name = ?", name)
         return err
     }
 }

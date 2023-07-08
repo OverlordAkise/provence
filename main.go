@@ -597,7 +597,7 @@ func main() {
 		AddCronjobStruct(cj, cr, false)
 		GetCronjobLog(cj.Name)
 		//save to db that its active again
-		err = Db.SetCronjobStatus(structs.DeleteStruct{aname}, true)
+		err = Db.SetCronjobStatus(aname, true)
 		if err != nil {
 			logger.Errorw("/setactive db error", "func", "SetCronjobActive", "name", aname, "err", err)
 			c.String(500, err.Error())
@@ -617,7 +617,7 @@ func main() {
 		cr.Remove(cron.EntryID(cj.EntryId))
 		//delete(CronJobNames, cj.Name)
 		//save to db that its active again
-		err := Db.SetCronjobStatus(structs.DeleteStruct{aname}, false)
+		err := Db.SetCronjobStatus(aname, false)
 		if err != nil {
 			logger.Errorw("/setinactive db error", "func", "SetCronjobInactive", "name", aname, "err", err)
 			c.String(500, err.Error())
