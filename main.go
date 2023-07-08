@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 	//Logging
-	"log"
-	"os"
+	ginzap "github.com/gin-contrib/zap"
+	"go.uber.org/zap"
 	//Config file
 	"io/ioutil"
 	"sigs.k8s.io/yaml"
@@ -49,14 +49,14 @@ func WrapF(f http.HandlerFunc) gin.HandlerFunc {
 
 func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) error {
 	if cj.EntryId != 0 {
-		LogInfo("AddCronjobStruct() // exists,replacing")
+		logger.Infow("AddCronjob, replacing cronjob", "id", cj.EntryId, "name", cj.Name)
 		c.Remove(cron.EntryID(cj.EntryId))
 		delete(CronJobNames, cj.Name)
 	}
 	eid, err := c.AddFunc(cj.Schedule, func() {
 		defer func() {
 			if r := recover(); r != nil {
-				LogError("Recovered panic in CronFunc!:", r)
+				logger.Errorw("recovered panic in cronjob", "recover", r)
 			}
 		}()
 		ec := exec.Command("bash", "-c", cj.Bash) //.Output()
@@ -66,17 +66,16 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 		ec.Stderr = &stderr
 		err := ec.Run()
 		if err != nil {
-			LogError("CronJob failed exec: ", cj.Name, " // ", fmt.Sprint(err)+": "+stderr.String())
+			logger.Errorw("cronjob failed", "name", cj.Name, "err", err, "stdout", cmd.String(), "stderr", stderr.String())
 			AddCronjobLog(false, cj.Name, cmd.String(), fmt.Sprint(err)+": "+stderr.String())
 			NotifyUsers(cj, fmt.Sprint(err)+": "+stderr.String(), true)
 		} else {
-			LogInfo("CronJob succeeded exec: ", cj.Name)
+			logger.Infow("cronjob succeeded", "name", cj.Name, "stdout", cmd.String())
 			AddCronjobLog(true, cj.Name, cmd.String(), "")
 			NotifyUsers(cj, cmd.String(), false)
 		}
 	})
 	if err != nil {
-		LogError("cron.AddFunc(", cj.Schedule, ",", cj.Name, ") // err")
 		return err
 	}
 	id := int(eid)
@@ -85,29 +84,26 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 	if shouldSaveToDb {
 		err = Db.AddCronjob(cj)
 		if err != nil {
-			LogError("Db.AddCronjob(", cj.Name, ") // ", err)
 			return err
 		}
 	}
-	LogInfo("AddCronjobStruct() // ", cj.Name)
+	logger.Infow("cronjob added", "name", cj.Name, "id", cj.EntryId)
 	return nil
 }
 
 func DeleteCronjob(dj structs.DeleteStruct, c *cron.Cron) error {
 	err := Db.DeleteCronjob(dj)
 	if err != nil {
-		LogError("Db.DeleteCronjob(", dj.Name, ") // ", err)
 		return err
 	}
 	eid, eidExists := CronJobNames[dj.Name]
 	if !eidExists {
-		LogError("DeleteCronjob() // ", dj.Name, " cronjob doesn't exist in Names map!")
-		return nil
+		return fmt.Errorf("Cronjob for deletion not found in CronJobNames! Impossible to delete!")
 	}
 	c.Remove(cron.EntryID(eid.EntryId))
 	delete(CronJobNames, dj.Name)
 	delete(CronJobLogLast, dj.Name)
-	LogInfo("DeleteCronjob() // ", dj.Name)
+	logger.Infow("cronjob deleted", "name", dj.Name, "id", eid.EntryId)
 	return nil
 }
 
@@ -119,7 +115,7 @@ func AddCronjobLog(success bool, name, output, errStr string) {
 	cjl.Err = errStr
 	err := Db.AddCronjobLog(cjl)
 	if err != nil {
-		LogError("Db.AddCronjobLog() // ", name, " ", err)
+		logger.Errorw("add cronjoblog error", "name", name, "err", err)
 	}
 	CronJobLogLast[name] = cjl
 }
@@ -127,7 +123,7 @@ func AddCronjobLog(success bool, name, output, errStr string) {
 func GetCronjobLog(name string) {
 	cjl, err := Db.GetLastLog(name)
 	if err != nil {
-		LogError("GetCronjobLog() // No logs found for:", name)
+		logger.Errorw("get cronjoblog error", "name", name, "err", err)
 		return
 	}
 	CronJobLogLast[name] = cjl
@@ -137,12 +133,17 @@ func NotifyUsers(cjo structs.CronJob, errstr string, isError bool) {
 	//If notifygroup changed we get the correct cache here
 	cj, cjExists := CronJobNames[cjo.Name]
 	if !cjExists {
-		LogError("NotifyUsers() CronJobNames[Name] // Couldn't cjo in cache, using old!")
+		logger.Warnw("couldnt get cronjob from CronJobNames", "name", cjo.Name)
 		cj = cjo
 	}
 	ng, dbError := Db.GetNotifyGroup(cj.NotifyGroup)
 	if dbError != nil {
-		LogError("Db.GetNotifyGroup(", cj.Name, ",", isError, ") // ", dbError)
+		logger.Errorw("couldnt get notifygroup from db", "name", cj.Name, "notifygroup", cj.NotifyGroup, "err", dbError)
+		return
+	}
+
+	if ng.Name == "" {
+		logger.Errorw("no notifygroup found for cronjob", "name", cj.Name, "notifygroup", cj.NotifyGroup)
 		return
 	}
 
@@ -170,54 +171,48 @@ func NotifyUsers(cjo structs.CronJob, errstr string, isError bool) {
 	}
 
 	if !shouldNotify {
-		LogInfo("Not notifying: ", cj.Name, CronJobFails[cj.Name])
+		logger.Infow("not notifying", "name", cj.Name, "failcount", CronJobFails[cj.Name])
 		return
 	}
 
-	if ng.Name == "" {
-		LogError("ERROR: NO NOTIFYGROUP FOUND ON CRONJOB!:")
-		LogError(cj)
-		return
-	}
+	logger.Infow("sending notifications", "name", cj.Name, "notifygroup", ng.Name, "shouldemail", ng.Shouldemail, "shouldgotify", ng.Shouldgotify, "shouldwebhook", ng.Shouldwebhook)
+
 	if ng.Shouldemail {
-		LogInfo("Notifying via email")
 		auth := smtp.PlainAuth("", config.Mailfrom, config.Mailpass, config.Mailhost)
 		err := smtp.SendMail(config.Mailhost+":"+config.Mailport, auth, config.Mailfrom, strings.Split(ng.Emailaddresses, ";"), []byte("Subject: [provence]"+tag+" "+cj.Name+"\n\n"+infoMsg+errstr))
 		if err != nil {
-			LogError("ERROR DURING EMAIL NOTIF:")
-			LogError(err)
+			logger.Errorw("error during email notification", "name", cj.Name, "notifygroup", ng.Name, "err", err)
 		}
 	}
+
 	if ng.Shouldgotify {
-		LogInfo("Notifying via gotify")
-		http.PostForm(ng.Gotifyurl+"message?token="+ng.Gotifykey,
+		_, err := http.PostForm(ng.Gotifyurl+"message?token="+ng.Gotifykey,
 			url.Values{"message": {errstr}, "title": {cj.Name}, "priority": {"9"}})
+		if err != nil {
+			logger.Errorw("error during gotify notification", "name", cj.Name, "notifygroup", ng.Name, "err", err)
+		}
 	}
+
 	if ng.Shouldwebhook {
-		LogInfo("Notifying via webhook")
 		data := map[string]interface{}{
 			"content": "[provence]" + tag + " " + cj.Name + "\n\n" + infoMsg + errstr,
 		}
 		jsonData, err := json.Marshal(data)
 		if err != nil {
-			LogError("ERROR DURING Webhook json.Marshal")
-			LogError(err)
+			logger.Errorw("error during webhook notification", "name", cj.Name, "notifygroup", ng.Name, "err", err)
 			return
 		}
 		req, err := http.NewRequest("POST", ng.Webhookurl, bytes.NewReader(jsonData))
 		if err != nil {
-			LogError("ERROR DURING http.NewRequest CREATION!")
-			LogError(err)
+			logger.Errorw("error during webhook notification", "name", cj.Name, "notifygroup", ng.Name, "err", err)
 			return
 		}
 		req.Header.Add("Content-Type", "application/json")
 		_, err = httpclient.Do(req)
 		if err != nil {
-			LogError("ERROR DURING httpclient.Do")
-			LogError(err)
+			logger.Errorw("error during webhook notification", "name", cj.Name, "notifygroup", ng.Name, "err", err)
 		}
 	}
-
 }
 
 // Logging
@@ -226,26 +221,20 @@ func RequestLogger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		t := time.Now()
-		LogReq(c.Request.URL, " | ", c.Writer.Status(), " | ", c.ClientIP(), " | ", t.Sub(start), " | size ", c.Writer.Size())
+		logger.Infow("webrequest",
+			"url", c.Request.URL.String(),
+			"ret", c.Writer.Status(),
+			"ip", c.ClientIP(),
+			"duration", t.Sub(start),
+			"rsize", c.Writer.Size(),
+
+			//If you use "go.opentelemetry.io/otel":
+			//"trace_id",tr.SpanFromContext(c.Request.Context()).SpanContext().TraceID().String(),
+		)
 	}
 }
 
-func LogError(v ...any) {
-	v = append([]interface{}{"[error] "}, v...)
-	Logger.Println(v...)
-}
-
-func LogInfo(v ...any) {
-	v = append([]interface{}{"[info ] "}, v...)
-	Logger.Println(v...)
-}
-
-func LogReq(v ...any) {
-	v = append([]interface{}{"[req  ] "}, v...)
-	Logger.Println(v...)
-}
-
-var Logger *log.Logger
+var logger *zap.SugaredLogger
 
 // Caches
 var CronJobLogLast = make(map[string]structs.CronJobLog)
@@ -276,8 +265,17 @@ func main() {
 	Db.Init(config.Constring)
 
 	//Logger
-	Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lmsgprefix|log.Lshortfile)
-	fmt.Println("Logger setup done!")
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{
+		"./provence.log", //Set this to "stdout" for logging to stdout
+	}
+	flogger, err := cfg.Build()
+	logger = flogger.Sugar()
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+	fmt.Println("logger setup")
 
 	//CronJobs
 	cr := cron.New()
@@ -286,7 +284,6 @@ func main() {
 		panic(err)
 	}
 	for _, cj := range cronjobs {
-		LogInfo("AddCronjobStruct() init // ", cj.Name)
 		if cj.Active {
 			AddCronjobStruct(cj, cr, false)
 		} else {
@@ -295,6 +292,7 @@ func main() {
 		GetCronjobLog(cj.Name)
 	}
 	cr.Start()
+	fmt.Println("started cron")
 
 	//oidc
 	state := func() string {
@@ -325,7 +323,7 @@ func main() {
 	//Webserver
 	gin.SetMode(gin.ReleaseMode)
 	app := gin.New()
-	app.Use(gin.Recovery())
+	app.Use(ginzap.RecoveryWithZap(flogger, true))
 	app.Use(RequestLogger())
 	gin.DisableConsoleColor()
 	//app.LoadHTMLGlob("templates/*")
@@ -399,7 +397,6 @@ func main() {
 			s := sessions.Default(c)
 			s.Set("name", info.UserInfoProfile.PreferredUsername)
 			s.Set("idtoken", tokens.IDToken)
-			//fmt.Println("UserInfo:",info)
 			s.Save()
 			http.Redirect(w, r, config.Host+"home", 301)
 		}
@@ -418,13 +415,13 @@ func main() {
 		app.POST("/login", func(c *gin.Context) {
 			u := new(structs.User)
 			if err := c.ShouldBind(u); err != nil {
-				LogError("login error (c.ShouldBind) // ", err)
+				logger.Errorw("/login bind error", "err", err)
 				c.Redirect(302, config.Host+"login")
 				return
 			}
 			sess := sessions.Default(c)
 			if u.Name != config.Webuser || u.Pw != config.Webpass {
-				LogError("login wrong password (", u.Name, ",", u.Pw, ")")
+				logger.Errorw("wrong login", "name", u.Name, "pw", u.Pw)
 				c.Redirect(302, config.Host+"login")
 				return
 			}
@@ -479,7 +476,7 @@ func main() {
 	app.GET("/jobs", func(c *gin.Context) {
 		cjs, err := Db.GetAllCronjobs()
 		if err != nil {
-			LogError("/home Db.GetAllCronjobs()// ", err)
+			logger.Errorw("/jobs db error", "func", "GetAllCronjobs", "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -493,8 +490,8 @@ func main() {
 		aname := c.DefaultQuery("name", "")
 		cjls, err := Db.GetLastLogs(aname, config.Historylength)
 		if err != nil {
-			LogError("Db.GetLastLogs(", aname, ") // ", err)
-			c.String(500, "ERROR DURING GETLASTLOGS!")
+			logger.Errorw("/history db error", "func", "GetLastLogs", "name", aname, "err", err)
+			c.String(500, err.Error())
 			return
 		}
 		c.HTML(200, "history", gin.H{
@@ -507,8 +504,8 @@ func main() {
 	app.GET("/notifygroups", func(c *gin.Context) {
 		ngs, err := Db.GetAllNotifygroups()
 		if err != nil {
-			LogError("Db.GetAllNotifygroups() // ", err)
-			c.String(500, "ERROR DURING GETALLNOTIFYGROUPS!")
+			logger.Errorw("/notifygroups db error", "func", "GetAllNotifygroups", "err", err)
+			c.String(500, err.Error())
 			return
 		}
 		c.HTML(200, "notifygroups", gin.H{
@@ -521,8 +518,8 @@ func main() {
 		aname := c.DefaultQuery("name", "")
 		ngs, err := Db.GetAllNotifygroups()
 		if err != nil {
-			LogError("Db.GetAllNotifygroups() // ", err)
-			c.String(500, "ERROR DURING GETALLNOTIFYGROUPS!")
+			logger.Errorw("/editjob db error", "func", "GetAllNotifygroups", "err", err)
+			c.String(500, err.Error())
 			return
 		}
 		c.HTML(200, "editjob", gin.H{
@@ -550,8 +547,8 @@ func main() {
 	app.GET("/addjob", func(c *gin.Context) {
 		ngs, ngerr := Db.GetAllNotifygroups()
 		if ngerr != nil {
-			LogError("Db.GetAllNotifygroups() // ", err)
-			c.String(500, "ERROR DURING GETALLNOTIFYGROUPS!")
+			logger.Errorw("/addjob db error", "func", "GetAllNotifygroups", "err", err)
+			c.String(500, err.Error())
 			return
 		}
 		c.HTML(200, "editjob", gin.H{
@@ -569,13 +566,13 @@ func main() {
 	app.POST("/notifygroup", func(c *gin.Context) {
 		ng := new(structs.NotifyGroup)
 		if err := c.ShouldBind(ng); err != nil {
-			LogError("POST /notifygroup bind error // ", err)
+			logger.Errorw("/notifygroup bind error", "err", err)
 			c.String(500, err.Error())
 			return
 		}
 		err := Db.AddNotifygroup(*ng)
 		if err != nil {
-			LogError("Db.AddNotifygroup(", ng.Name, ") // ", err)
+			logger.Errorw("/notifygroup db error", "func", "AddNotifygroup", "name", ng.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -584,13 +581,13 @@ func main() {
 	app.POST("/job", func(c *gin.Context) {
 		cj := new(structs.CronJob)
 		if err := c.ShouldBind(cj); err != nil {
-			LogError("POST /job bind error // ", err)
+			logger.Errorw("/job bind error", "err", err)
 			c.String(500, err.Error())
 			return
 		}
 		err := AddCronjobStruct(*cj, cr, true)
 		if err != nil {
-			LogError("Db.AddNotifygroup(", cj.Name, ") // ", err)
+			logger.Errorw("/job db error", "func", "AddCronjobStruct", "name", cj.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -600,13 +597,13 @@ func main() {
 	app.POST("/deletejob", func(c *gin.Context) {
 		dj := new(structs.DeleteStruct)
 		if err := c.ShouldBind(dj); err != nil {
-			LogError("POST /deletejob bind error // ", err)
+			logger.Errorw("/deletejob bind error", "err", err)
 			c.String(500, err.Error())
 			return
 		}
 		err := DeleteCronjob(*dj, cr)
 		if err != nil {
-			LogError("Db.AddNotifygroup(", dj.Name, ") // ", err)
+			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", dj.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -616,13 +613,13 @@ func main() {
 	app.POST("/deletenotifygroup", func(c *gin.Context) {
 		dn := new(structs.DeleteStruct)
 		if err := c.ShouldBind(dn); err != nil {
-			LogError("POST /deletenotifygroup bind error // ", err)
+			logger.Errorw("/deletenotifygroup bind error", "err", err)
 			c.String(500, err.Error())
 			return
 		}
 		err := Db.DeleteNotifygroup(*dn)
 		if err != nil {
-			LogError("Db.AddNotifygroup(", dn.Name, ") // ", err)
+			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", dn.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -632,22 +629,22 @@ func main() {
 	app.POST("/testbash", func(c *gin.Context) {
 		tj := new(structs.Testbash)
 		if err := c.ShouldBind(tj); err != nil {
-			c.String(500, "Binding failed")
+			logger.Errorw("/testbash bind error", "err", err)
+			c.String(500, err.Error())
 			return
 		}
-		LogInfo("/testbash before test // ", strings.ReplaceAll(tj.Bash, "\n", "\\n"))
-		ec := exec.Command("bash", "-c", tj.Bash) //.Output()
+		logger.Infow("testing bash", "bash", tj.Bash) //TODO: Test this if \n is correctly logged
+		ec := exec.Command("bash", "-c", tj.Bash)     //.Output()
 		var cmd bytes.Buffer
 		var stderr bytes.Buffer
 		ec.Stdout = &cmd
 		ec.Stderr = &stderr
 		err := ec.Run()
 		if err != nil {
-			strerr := fmt.Sprint(err) + ": " + stderr.String()
-			LogError("/testbash failed // ", strings.ReplaceAll(strerr, "\n", "\\n"))
-			c.String(500, strerr)
+			logger.Errorw("testbash failed", "err", err, "stdout", cmd.String(), "stderr", stderr.String())
+			c.String(500, stderr.String())
 		} else {
-			LogInfo("/testbash succeeded // ", strings.ReplaceAll(cmd.String(), "\n", "\\n"))
+			logger.Infow("testbash success", "stdout", cmd.String(), "stderr", stderr.String())
 			c.String(200, cmd.String())
 		}
 	})
@@ -658,7 +655,7 @@ func main() {
 		//logic to let cronjob run again
 		cj, err := Db.GetCronjob(aname)
 		if err != nil {
-			LogError("Db.GetCronjob(", aname, ") // ", err)
+			logger.Errorw("/setactive db error", "func", "GetCronjob", "name", aname, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -667,7 +664,7 @@ func main() {
 		//save to db that its active again
 		err = Db.SetCronjobActive(structs.DeleteStruct{aname})
 		if err != nil {
-			LogError("Db.SetCronjobActive(", aname, ") // ", err)
+			logger.Errorw("/setactive db error", "func", "SetCronjobActive", "name", aname, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -677,7 +674,7 @@ func main() {
 		aname := c.DefaultQuery("name", "")
 		cj, exists := CronJobNames[aname]
 		if !exists {
-			LogError("/setinactive with non-existing name: ", aname)
+			logger.Errorw("/setinactive with non-existing name error", "name", aname)
 			c.String(500, "ERROR: Name doesnt exist!")
 			return
 		}
@@ -687,7 +684,7 @@ func main() {
 		//save to db that its active again
 		err := Db.SetCronjobInactive(structs.DeleteStruct{aname})
 		if err != nil {
-			LogError("Db.SetCronjobInactive(", aname, ") // ", err)
+			logger.Errorw("/setinactive db error", "func", "SetCronjobInactive", "name", aname, "err", err)
 			c.String(500, err.Error())
 			return
 		}
@@ -695,8 +692,7 @@ func main() {
 	})
 
 	donetime := time.Now()
-	LogInfo("Startup finished, time taken:", donetime.Sub(starttime))
-	LogInfo("Port:", config.Listenport, "Host:", config.Host)
-	LogInfo("Now Listening...")
-	LogError(app.Run(":" + config.Listenport))
+	logger.Infow("provence started", "time", donetime.Sub(starttime), "port", config.Listenport, "host", config.Host)
+	fmt.Println("Now Listening", config.Listenport, config.Host)
+	fmt.Println(app.Run(":" + config.Listenport))
 }
