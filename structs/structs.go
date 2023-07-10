@@ -17,12 +17,14 @@ type CronJob struct {
 }
 
 type CronJobLog struct {
-	Id      int    `db:"id" json:"id" form:"id"`
-	Success bool   `db:"success" json:"success" form:"success"`
-	Name    string `db:"name" json:"name" form:"name"`
-	Output  string `db:"output" json:"output" form:"output"`
-	Err     string `db:"err" json:"err" form:"err"`
-	Created string `db:"created" json:"created" form:"created"`
+	Id              int    `db:"id" json:"id" form:"id"`
+	Success         bool   `db:"success" json:"success" form:"success"`
+	Name            string `db:"name" json:"name" form:"name"`
+	Timetaken       int64  `db:"timetaken" json:"timetaken" form:"timetaken"`
+	Prettytimetaken string `db:"timetaken" json:"timetaken" form:"timetaken"`
+	Output          string `db:"output" json:"output" form:"output"`
+	Err             string `db:"err" json:"err" form:"err"`
+	Created         string `db:"created" json:"created" form:"created"`
 }
 
 type NotifyGroup struct {

@@ -50,14 +50,17 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 		var stderr bytes.Buffer
 		ec.Stdout = &cmd
 		ec.Stderr = &stderr
+		starttime := time.Now()
 		err := ec.Run()
+		donetime := time.Now()
+		taken := donetime.Sub(starttime)
 		if err != nil {
-			logger.Errorw("cronjob failed", "name", cj.Name, "err", err, "stdout", cmd.String(), "stderr", stderr.String())
-			AddCronjobLog(false, cj.Name, cmd.String(), fmt.Sprint(err)+": "+stderr.String())
+			logger.Errorw("cronjob failed", "name", cj.Name, "err", err, "stdout", cmd.String(), "stderr", stderr.String(), "time", taken)
+			AddCronjobLog(false, cj.Name, cmd.String(), fmt.Sprint(err)+": "+stderr.String(), taken)
 			NotifyUsers(cj, fmt.Sprint(err)+": "+stderr.String(), true)
 		} else {
-			logger.Infow("cronjob succeeded", "name", cj.Name, "stdout", cmd.String())
-			AddCronjobLog(true, cj.Name, cmd.String(), "")
+			logger.Infow("cronjob succeeded", "name", cj.Name, "stdout", cmd.String(), "time", taken)
+			AddCronjobLog(true, cj.Name, cmd.String(), "", taken)
 			NotifyUsers(cj, cmd.String(), false)
 		}
 	})
@@ -93,10 +96,11 @@ func DeleteCronjob(name string, c *cron.Cron) error {
 	return nil
 }
 
-func AddCronjobLog(success bool, name, output, errStr string) {
+func AddCronjobLog(success bool, name, output, errStr string, timeTaken time.Duration) {
 	cjl := structs.CronJobLog{}
 	cjl.Success = success
 	cjl.Name = name
+	cjl.Timetaken = int64(timeTaken) //time.Duration is just a int64
 	cjl.Output = output
 	cjl.Err = errStr
 	err := Db.AddCronjobLog(cjl)
@@ -568,8 +572,8 @@ func main() {
 			c.String(500, err.Error())
 			return
 		}
-		logger.Infow("testing bash", "bash", tj.Bash) //TODO: Test this if \n is correctly logged
-		ec := exec.Command("bash", "-c", tj.Bash)     //.Output()
+		logger.Infow("testing bash", "bash", tj.Bash)
+		ec := exec.Command("bash", "-c", tj.Bash) //.Output()
 		var cmd bytes.Buffer
 		var stderr bytes.Buffer
 		ec.Stdout = &cmd
