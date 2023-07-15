@@ -257,7 +257,7 @@ func main() {
 	//Logger
 	cfg := zap.NewProductionConfig()
 	cfg.OutputPaths = []string{
-		"./provence.log", //Set this to "stdout" for logging to stdout
+		config.Loglocation,
 	}
 	flogger, err := cfg.Build()
 	logger = flogger.Sugar()

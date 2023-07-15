@@ -13,3 +13,5 @@ mailhost: gmail.org
 mailport: 587
 # for url redirecting, set this to root url of web path
 host: http://localhost:7070/
+# log location, can be set to "stdout"
+loglocation: ./provence.log
