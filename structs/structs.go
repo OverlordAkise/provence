@@ -6,7 +6,7 @@ type CronJob struct {
 	Active           bool   `db:"active" json:"active" form:"active"`
 	Schedule         string `db:"schedule" json:"schedule" form:"schedule"`
 	Bash             string `db:"bash" json:"bash" form:"bash"`
-	Name             string `db:"name" json:"name" form:"name"`
+	Name             string `db:"name" json:"name" form:"name" binding:"min=1"`
 	Group            string `db:"grp" json:"group" form:"group"`
 	Desc             string `db:"description" json:"desc" form:"desc"`
 	Severity         string `db:"severity" json:"severity" form:"severity"`
@@ -62,7 +62,7 @@ type User struct {
 }
 
 type Testbash struct {
-	Bash string `form:"bash" json:"bash" xml:"bash"`
+	Bash string `form:"bash" json:"bash" xml:"bash" binding:"min=1"`
 }
 
 type Overview struct {
