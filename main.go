@@ -213,6 +213,7 @@ func RequestLogger() gin.HandlerFunc {
 		t := time.Now()
 		logger.Infow("webrequest",
 			"url", c.Request.URL.String(),
+            "method", c.Request.Method,
 			"ret", c.Writer.Status(),
 			"ip", c.ClientIP(),
 			"duration", t.Sub(start),
