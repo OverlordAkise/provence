@@ -461,10 +461,16 @@ func main() {
 			c.String(500, err.Error())
 			return
 		}
+        cj, err := Db.GetCronjob(aname)
+        if err != nil {
+            logger.Errorw("/editjob db error", "func", "GetCronjob", "name", aname, "err", err)
+            c.String(500, err.Error())
+            return
+        }
 		c.HTML(200, "editjob", gin.H{
 			"Title":        "Provence | Edit Job " + aname,
-			"Cronjob":      CronJobNames[aname], //null aka. new job if empty
-			"NotifyGroups": ngs,                 //for dropdown selection
+			"Cronjob":      cj,
+			"NotifyGroups": ngs, //for dropdown selection
 		})
 	})
 
