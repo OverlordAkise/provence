@@ -29,7 +29,7 @@ type CronJobLog struct {
 
 type NotifyGroup struct {
 	Id             int    `db:"id" json:"id" form:"id"`
-	Name           string `db:"name" json:"name" form:"name"`
+	Name           string `db:"name" json:"name" form:"name" binding:"required,min=1"`
 	Gotifyurl      string `db:"gotifyurl" json:"gotifyurl" form:"gotifyurl"`
 	Gotifykey      string `db:"gotifykey" json:"gotifykey" form:"gotifykey"`
 	Emailaddresses string `db:"emailaddresses" json:"emailaddresses" form:"emailaddresses"`

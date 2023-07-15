@@ -504,26 +504,22 @@ func main() {
 	// API
 	app.POST("/notifygroup", func(c *gin.Context) {
 		ng := new(structs.NotifyGroup)
-		if err := c.ShouldBind(ng); err != nil {
-			logger.Errorw("/notifygroup bind error", "err", err)
-			c.String(500, err.Error())
-			return
-		}
+		if err := c.BindJSON(ng); err != nil {
+            return
+        }
 		err := Db.AddNotifygroup(*ng)
 		if err != nil {
 			logger.Errorw("/notifygroup db error", "func", "AddNotifygroup", "name", ng.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		c.Redirect(302, config.Host+"notifygroups")
+		c.String(200, "OK")
 	})
 	app.POST("/job", func(c *gin.Context) {
 		cj := new(structs.CronJob)
-		if err := c.ShouldBind(cj); err != nil {
-			logger.Errorw("/job bind error", "err", err)
-			c.String(500, err.Error())
-			return
-		}
+		if err := c.BindJSON(cj); err != nil {
+            return
+        }
 		err := AddCronjobStruct(*cj, cr, true)
 		if err != nil {
 			logger.Errorw("/job db error", "func", "AddCronjobStruct", "name", cj.Name, "err", err)
@@ -567,9 +563,7 @@ func main() {
 
 	app.POST("/testbash", func(c *gin.Context) {
 		tj := new(structs.Testbash)
-		if err := c.ShouldBind(tj); err != nil {
-			logger.Errorw("/testbash bind error", "err", err)
-			c.String(500, err.Error())
+		if err := c.BindJSON(tj); err != nil {
 			return
 		}
 		logger.Infow("testing bash", "bash", tj.Bash)
