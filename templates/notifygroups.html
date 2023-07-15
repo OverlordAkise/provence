@@ -10,28 +10,9 @@
         <td class="nm">{{if $v.Shouldgotify}}[X]{{else}}[_]{{end}}</td>
         <td class="nm">{{if $v.Shouldwebhook}}[X]{{else}}[_]{{end}}</td>
         <td><a href="editnotifygroup?name={{$v.Name}}"><button>edit</button></a></td>
-        <td><button name="{{$v.Name}}" class="deletebtn">delete</button></td>
+        <td><button url="deletenotifygroup" name="{{$v.Name}}" class="deletebtn">delete</button></td>
     </tr>
 {{end}}
 </table>
-<script>
-let els = document.getElementsByClassName("deletebtn")
-for(let i=0;i<els.length;i++){
-    el = els[i];
-    el.addEventListener("click",function(ev){
-    
-        ev.preventDefault();
-        let conf = confirm("Really delete?")
-        if (!conf) {
-            return;
-        }
-        ProvenceSendRequest("deletenotifygroup",{"name": this.name},function(s,t){
-            location.reload();
-        });
-        
-        
-    });
-}
-</script>
 {{ template "Footer" }}
 {{end}}

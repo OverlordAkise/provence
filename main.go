@@ -81,11 +81,11 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 }
 
 func DeleteCronjob(cj structs.CronJob, c *cron.Cron) error {
-    err := Db.DeleteCronjob(cj)
+	err := Db.DeleteCronjob(cj)
 	if err != nil {
 		return err
 	}
-    name := cj.Name
+	name := cj.Name
 	eid, eidExists := CronJobNames[name]
 	if !eidExists {
 		return fmt.Errorf("Cronjob for deletion not found in CronJobNames! Impossible to delete!")
@@ -127,9 +127,9 @@ func NotifyUsers(cjo structs.CronJob, errstr string, isError bool) {
 		logger.Warnw("couldnt get cronjob from CronJobNames", "name", cjo.Name)
 		cj = cjo
 	}
-	ng, dbError := Db.GetNotifyGroup(cj.NotifyGroup)
-	if dbError != nil {
-		logger.Errorw("couldnt get notifygroup from db", "name", cj.Name, "notifygroup", cj.NotifyGroup, "err", dbError)
+	ng, err := Db.GetNotifyGroup(cj.NotifyGroup)
+	if err != nil {
+		logger.Errorw("couldnt get notifygroup from db", "name", cj.Name, "notifygroup", cj.NotifyGroup, "err", err)
 		return
 	}
 
@@ -214,7 +214,7 @@ func RequestLogger() gin.HandlerFunc {
 		t := time.Now()
 		logger.Infow("webrequest",
 			"url", c.Request.URL.String(),
-            "method", c.Request.Method,
+			"method", c.Request.Method,
 			"ret", c.Writer.Status(),
 			"ip", c.ClientIP(),
 			"duration", t.Sub(start),
@@ -463,12 +463,12 @@ func main() {
 			c.String(500, err.Error())
 			return
 		}
-        cj, err := Db.GetCronjob(aname)
-        if err != nil {
-            logger.Errorw("/editjob db error", "func", "GetCronjob", "name", aname, "err", err)
-            c.String(500, err.Error())
-            return
-        }
+		cj, err := Db.GetCronjob(aname)
+		if err != nil {
+			logger.Errorw("/editjob db error", "func", "GetCronjob", "name", aname, "err", err)
+			c.String(500, err.Error())
+			return
+		}
 		c.HTML(200, "editjob", gin.H{
 			"Title":        "Provence | Edit Job " + aname,
 			"Cronjob":      cj,
@@ -492,8 +492,8 @@ func main() {
 	})
 
 	app.GET("/addjob", func(c *gin.Context) {
-		ngs, ngerr := Db.GetAllNotifygroups()
-		if ngerr != nil {
+		ngs, err := Db.GetAllNotifygroups()
+		if err != nil {
 			logger.Errorw("/addjob db error", "func", "GetAllNotifygroups", "err", err)
 			c.String(500, err.Error())
 			return
@@ -513,8 +513,8 @@ func main() {
 	app.POST("/notifygroup", func(c *gin.Context) {
 		ng := new(structs.NotifyGroup)
 		if err := c.BindJSON(ng); err != nil {
-            return
-        }
+			return
+		}
 		err := Db.AddNotifygroup(*ng)
 		if err != nil {
 			logger.Errorw("/notifygroup db error", "func", "AddNotifygroup", "name", ng.Name, "err", err)
@@ -526,8 +526,8 @@ func main() {
 	app.POST("/job", func(c *gin.Context) {
 		cj := new(structs.CronJob)
 		if err := c.BindJSON(cj); err != nil {
-            return
-        }
+			return
+		}
 		err := AddCronjobStruct(*cj, cr, true)
 		if err != nil {
 			logger.Errorw("/job db error", "func", "AddCronjobStruct", "name", cj.Name, "err", err)
@@ -540,8 +540,8 @@ func main() {
 	app.POST("/deletejob", func(c *gin.Context) {
 		cj := new(structs.CronJob)
 		if err := c.BindJSON(cj); err != nil {
-            return
-        }
+			return
+		}
 		err := DeleteCronjob(*cj, cr)
 		if err != nil {
 			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", cj.Name, "err", err)
@@ -552,10 +552,10 @@ func main() {
 	})
 
 	app.POST("/deletenotifygroup", func(c *gin.Context) {
-        ng := new(structs.NotifyGroup)
+		ng := new(structs.NotifyGroup)
 		if err := c.BindJSON(ng); err != nil {
-            return
-        }
+			return
+		}
 		err := Db.DeleteNotifygroup(*ng)
 		if err != nil {
 			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", ng.Name, "err", err)

@@ -15,6 +15,23 @@ function ProvenceSendRequest(url,data,func) {
     xhr.send(data);
 }
 
+let els = document.getElementsByClassName("deletebtn")
+for(let i=0;i<els.length;i++){
+    el = els[i];
+    el.addEventListener("click",function(ev){
+    
+        ev.preventDefault();
+        let conf = confirm("Really delete?")
+        if (!conf) {
+            return;
+        }
+        ProvenceSendRequest(this.getAttribute("url"),{"name": this.name},function(s,t){
+            location.reload();
+        });
+        
+    });
+}
+
 </script>
 </html>
 {{end}}

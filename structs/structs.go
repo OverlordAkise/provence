@@ -53,7 +53,7 @@ type Config struct {
 	Mailport      string `json:"mailport"`
 	Listenport    string `json:"listenport"`
 	Host          string `json:"host"`
-    Loglocation   string `json:"loglocation"`
+	Loglocation   string `json:"loglocation"`
 }
 
 type User struct {
