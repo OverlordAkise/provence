@@ -43,57 +43,33 @@ for(let i=0;i<options.length;i++){
 
 document.getElementById("testbtn").addEventListener("click",function(ev){
     ev.preventDefault();
-    sendRequest();
+    ProvenceSendRequest("testbash",{"bash": document.getElementById("bash").value},function(status,text){
+        document.getElementById("retcode").innerText = status;
+        document.getElementById("retmsg").innerText = text;
+    });
 });
-function sendRequest() {
-    var xhr = new XMLHttpRequest();
-    var url = "testbash";
-    xhr.open("POST", url, true);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-            document.getElementById("retcode").innerText = xhr.status;
-            document.getElementById("retmsg").innerText = xhr.responseText;
-        }
-    };
-    var data = JSON.stringify({"bash": document.getElementById("bash").value});
-    xhr.send(data);
-}
 
 document.getElementById("mform").addEventListener("submit",function(ev){
     ev.preventDefault();
-    SendJob();
-    //console.log(ev);
-    //alert("submit!");
-});
-function SendJob() {
-    var xhr = new XMLHttpRequest();
-    var url = "job";
-    xhr.open("POST", url, true);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.onreadystatechange = function(){
-        if(xhr.readyState === 4){
+    ProvenceSendRequest("job",
+        {   //data
+            "active": document.getElementsByName("active")[0].checked,
+            "id": parseFloat(document.getElementsByName("id")[0].value),
+            "entryid": parseFloat(document.getElementsByName("entryid")[0].value),
+            "name": document.getElementsByName("name")[0].value,
+            "desc": document.getElementsByName("desc")[0].value,
+            "group": document.getElementsByName("group")[0].value,
+            "schedule": document.getElementsByName("schedule")[0].value,
+            "bash": document.getElementsByName("bash")[0].value,
+            "failsneeded": parseFloat(document.getElementsByName("failsneeded")[0].value),
+            "repeatnotifevery": parseFloat(document.getElementsByName("repeatnotifevery")[0].value),
+            "notifygroup": document.getElementsByName("notifygroup")[0].value,
+            "alwaysnotify": document.getElementsByName("alwaysnotify")[0].checked,
+        },function(status,text){
             window.location.replace("jobs");
         }
-    };
-    var data = {
-        "active": document.getElementsByName("active")[0].checked,
-        "id": parseFloat(document.getElementsByName("id")[0].value),
-        "entryid": parseFloat(document.getElementsByName("entryid")[0].value),
-        "name": document.getElementsByName("name")[0].value,
-        "desc": document.getElementsByName("desc")[0].value,
-        "group": document.getElementsByName("group")[0].value,
-        "schedule": document.getElementsByName("schedule")[0].value,
-        "bash": document.getElementsByName("bash")[0].value,
-        "failsneeded": parseFloat(document.getElementsByName("failsneeded")[0].value),
-        "repeatnotifevery": parseFloat(document.getElementsByName("repeatnotifevery")[0].value),
-        "notifygroup": document.getElementsByName("notifygroup")[0].value,
-        "alwaysnotify": document.getElementsByName("alwaysnotify")[0].checked,
-    };
-    console.log(data);
-    var jdata = JSON.stringify(data);
-    xhr.send(jdata);
-}
+    );
+});
 </script>
 {{ template "Footer" }}
 {{end}}
