@@ -19,38 +19,25 @@
 <script>
 document.getElementById("mform").addEventListener("submit",function(ev){
     ev.preventDefault();
-    SendNotifygroup();
-    //console.log(ev);
-    //alert("submit!");
-});
-function SendNotifygroup() {
-    var xhr = new XMLHttpRequest();
-    var url = "notifygroup";
-    xhr.open("POST", url, true);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.onreadystatechange = function(){
-        if(this.readyState === 4){
-            if (this.status != 200){
-                alert("error "+this.status);
+    ProvenceSendRequest("notifygroup",
+        {   //data
+            "name": document.getElementsByName("name")[0].value,
+            "gotifyurl": document.getElementsByName("gotifyurl")[0].value,
+            "gotifykey": document.getElementsByName("gotifykey")[0].value,
+            "emailaddresses": document.getElementsByName("emailaddresses")[0].value,
+            "webhookurl": document.getElementsByName("webhookurl")[0].value,
+            "shouldemail": document.getElementsByName("shouldemail")[0].checked,
+            "shouldgotify": document.getElementsByName("shouldgotify")[0].checked,
+            "shouldwebhook": document.getElementsByName("shouldwebhook")[0].checked,
+        },function(status,text){
+            if (status != 200){
+                alert("error "+status+"\n"+text);
             }else{
                 window.location.replace("notifygroups");
             }
         }
-    };
-    var data = {
-        "name": document.getElementsByName("name")[0].value,
-        "gotifyurl": document.getElementsByName("gotifyurl")[0].value,
-        "gotifykey": document.getElementsByName("gotifykey")[0].value,
-        "emailaddresses": document.getElementsByName("emailaddresses")[0].value,
-        "webhookurl": document.getElementsByName("webhookurl")[0].value,
-        "shouldemail": document.getElementsByName("shouldemail")[0].checked,
-        "shouldgotify": document.getElementsByName("shouldgotify")[0].checked,
-        "shouldwebhook": document.getElementsByName("shouldwebhook")[0].checked,
-    };
-    console.log(data);
-    var jdata = JSON.stringify(data);
-    xhr.send(jdata);
-}
+    );
+});
 </script>
 {{ template "Footer" }}
 {{end}}

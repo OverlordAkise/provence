@@ -66,7 +66,11 @@ document.getElementById("mform").addEventListener("submit",function(ev){
             "notifygroup": document.getElementsByName("notifygroup")[0].value,
             "alwaysnotify": document.getElementsByName("alwaysnotify")[0].checked,
         },function(status,text){
-            window.location.replace("jobs");
+            if (status != 200) {
+                alert("http"+status+"\n"+text);
+            }else{
+                window.location.replace("jobs");
+            }
         }
     );
 });

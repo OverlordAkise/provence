@@ -534,7 +534,7 @@ func main() {
 			c.String(500, err.Error())
 			return
 		}
-		c.Redirect(302, config.Host+"jobs")
+		c.String(200, "OK")
 	})
 
 	app.POST("/deletejob", func(c *gin.Context) {
