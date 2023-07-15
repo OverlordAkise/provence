@@ -551,20 +551,18 @@ func main() {
 		c.Redirect(302, config.Host+"jobs")
 	})
 
-	app.GET("/deletenotifygroup", func(c *gin.Context) {
-		aname := c.DefaultQuery("name", "")
-		if aname == "" {
-			logger.Errorw("/deletenotifygroup missing name")
-			c.String(500, "Missing name parameter!")
-			return
-		}
-		err := Db.DeleteNotifygroup(aname)
+	app.POST("/deletenotifygroup", func(c *gin.Context) {
+        ng := new(structs.NotifyGroup)
+		if err := c.BindJSON(ng); err != nil {
+            return
+        }
+		err := Db.DeleteNotifygroup(*ng)
 		if err != nil {
-			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", aname, "err", err)
+			logger.Errorw("/deletenotifygroup db error", "func", "DeleteNotifygroup", "name", ng.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		c.Redirect(302, config.Host+"notifygroups")
+		c.String(200, "OK")
 	})
 
 	app.POST("/testbash", func(c *gin.Context) {

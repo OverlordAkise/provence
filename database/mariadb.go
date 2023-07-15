@@ -119,7 +119,7 @@ func AddNotifygroup(ng structs.NotifyGroup) error {
 	return err
 }
 
-func DeleteNotifygroup(name string) error {
-	_, err := db.Exec("DELETE FROM notifygroup WHERE name = ?", name)
+func DeleteNotifygroup(ng structs.NotifyGroup) error {
+	_, err := db.Exec("DELETE FROM notifygroup WHERE name = ?", ng.Name)
 	return err
 }

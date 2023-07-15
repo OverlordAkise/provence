@@ -10,7 +10,7 @@
         <td class="nm">{{if $v.Shouldgotify}}[X]{{else}}[_]{{end}}</td>
         <td class="nm">{{if $v.Shouldwebhook}}[X]{{else}}[_]{{end}}</td>
         <td><a href="editnotifygroup?name={{$v.Name}}"><button>edit</button></a></td>
-        <td><a href="deletenotifygroup?name={{$v.Name}}" class="deletebtn"><button>delete</button></a></td>
+        <td><button name="{{$v.Name}}" class="deletebtn">delete</button></td>
     </tr>
 {{end}}
 </table>
@@ -25,7 +25,10 @@ for(let i=0;i<els.length;i++){
         if (!conf) {
             return;
         }
-        window.location = this.href;
+        ProvenceSendRequest("deletenotifygroup",{"name": this.name},function(s,t){
+            location.reload();
+        });
+        
         
     });
 }
