@@ -80,11 +80,12 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 	return nil
 }
 
-func DeleteCronjob(name string, c *cron.Cron) error {
-	err := Db.DeleteCronjob(name)
+func DeleteCronjob(cj structs.CronJob, c *cron.Cron) error {
+    err := Db.DeleteCronjob(cj)
 	if err != nil {
 		return err
 	}
+    name := cj.Name
 	eid, eidExists := CronJobNames[name]
 	if !eidExists {
 		return fmt.Errorf("Cronjob for deletion not found in CronJobNames! Impossible to delete!")
@@ -536,20 +537,18 @@ func main() {
 		c.Redirect(302, config.Host+"jobs")
 	})
 
-	app.GET("/deletejob", func(c *gin.Context) {
-		aname := c.DefaultQuery("name", "")
-		if aname == "" {
-			logger.Errorw("/deletejob missing name")
-			c.String(500, "Missing name parameter!")
-			return
-		}
-		err := DeleteCronjob(aname, cr)
+	app.POST("/deletejob", func(c *gin.Context) {
+		cj := new(structs.CronJob)
+		if err := c.BindJSON(cj); err != nil {
+            return
+        }
+		err := DeleteCronjob(*cj, cr)
 		if err != nil {
-			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", aname, "err", err)
+			logger.Errorw("/deletejob db error", "func", "DeleteCronjob", "name", cj.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		c.Redirect(302, config.Host+"jobs")
+		c.String(200, "OK")
 	})
 
 	app.POST("/deletenotifygroup", func(c *gin.Context) {

@@ -99,8 +99,8 @@ func AddCronjobLog(cjl structs.CronJobLog) error {
 	return err
 }
 
-func DeleteCronjob(name string) error {
-	_, err := db.Exec("DELETE FROM cronjob WHERE name = ?", name)
+func DeleteCronjob(cj structs.CronJob) error {
+	_, err := db.Exec("DELETE FROM cronjob WHERE name = ?", cj.Name)
 	return err
 }
 

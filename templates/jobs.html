@@ -20,7 +20,7 @@
         <td class="nm">{{$v.NotifyGroup}}</td>
         <td class="nm"><a{{if $v.Active}} href="setinactive?name={{$v.Name}}"><button>deactivate</button></a>{{else}} href="setactive?name={{$v.Name}}"><button>activate</button></a>{{end}}</td>
         <td><a href="editjob?name={{$v.Name}}"><button>edit</button></a></td>
-        <td><a href="deletejob?name={{$v.Name}}" class="deletebtn"><button>delete</button></a></td>
+        <td><button name="{{$v.Name}}" class="deletebtn">delete</button></td>
     </tr>
 {{end}}
 </table>
@@ -35,7 +35,9 @@ for(let i=0;i<els.length;i++){
         if (!conf) {
             return;
         }
-        window.location = this.href;
+        ProvenceSendRequest("deletejob",{"name": this.name},function(s,t){
+            location.reload();
+        });
         
     });
 }
