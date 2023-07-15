@@ -18,9 +18,9 @@
         <td class="nm">{{$v.Schedule}}</td>
         <td class="nm">{{$v.Desc}}</td>
         <td class="nm">{{$v.NotifyGroup}}</td>
-        <td class="nm"><a{{if $v.Active}} href="setinactive?name={{$v.Name}}"><button>deactivate</button></a>{{else}} href="setactive?name={{$v.Name}}"><button>activate</button></a>{{end}}</td>
+        <td class="nm"><button url="toggleactive" name="{{$v.Name}}" class="deletebtn">{{if $v.Active}}deactivate{{else}}activate{{end}}</button></td>
         <td><a href="editjob?name={{$v.Name}}"><button>edit</button></a></td>
-        <td><button url="deletejob" name="{{$v.Name}}" class="deletebtn">delete</button></td>
+        <td><button url="deletejob" verify="true" name="{{$v.Name}}" class="deletebtn">delete</button></td>
     </tr>
 {{end}}
 </table>

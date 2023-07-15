@@ -104,12 +104,12 @@ func DeleteCronjob(cj structs.CronJob) error {
 	return err
 }
 
-func SetCronjobStatus(name string, shouldBeActive bool) error {
+func SetCronjobStatus(cj structs.CronJob, shouldBeActive bool) error {
 	if shouldBeActive {
-		_, err := db.Exec("UPDATE cronjob SET active = true WHERE name = ?", name)
+		_, err := db.Exec("UPDATE cronjob SET active = true WHERE name = ?", cj.Name)
 		return err
 	} else {
-		_, err := db.Exec("UPDATE cronjob SET active = false WHERE name = ?", name)
+		_, err := db.Exec("UPDATE cronjob SET active = false WHERE name = ?", cj.Name)
 		return err
 	}
 }

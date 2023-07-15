@@ -587,45 +587,43 @@ func main() {
 	})
 
 	//Status Active / Inactive
-	app.GET("/setactive", func(c *gin.Context) {
-		aname := c.DefaultQuery("name", "")
+	app.POST("/toggleactive", func(c *gin.Context) {
+		tempcj := new(structs.CronJob)
+		if err := c.BindJSON(tempcj); err != nil {
+			return
+		}
 		//logic to let cronjob run again
-		cj, err := Db.GetCronjob(aname)
+		cj, err := Db.GetCronjob(tempcj.Name)
 		if err != nil {
-			logger.Errorw("/setactive db error", "func", "GetCronjob", "name", aname, "err", err)
+			logger.Errorw("/toggleactive db error", "func", "GetCronjob", "name", tempcj.Name, "err", err)
 			c.String(500, err.Error())
 			return
 		}
-		AddCronjobStruct(cj, cr, false)
-		GetCronjobLog(cj.Name)
-		//save to db that its active again
-		err = Db.SetCronjobStatus(aname, true)
-		if err != nil {
-			logger.Errorw("/setactive db error", "func", "SetCronjobActive", "name", aname, "err", err)
-			c.String(500, err.Error())
-			return
+		if !cj.Active {
+			AddCronjobStruct(cj, cr, false)
+			GetCronjobLog(cj.Name)
+			err = Db.SetCronjobStatus(cj, true)
+			if err != nil {
+				logger.Errorw("/toggleactive db error", "func", "SetCronjobStatus", "name", tempcj.Name, "err", err)
+				c.String(500, err.Error())
+				return
+			}
+		} else {
+			cj, exists := CronJobNames[cj.Name]
+			if !exists {
+				logger.Errorw("/toggleactive with non-existing name error", "name", cj.Name)
+				c.String(500, "ERROR: Name doesnt exist!")
+				return
+			}
+			cr.Remove(cron.EntryID(cj.EntryId))
+			err = Db.SetCronjobStatus(cj, false)
+			if err != nil {
+				logger.Errorw("/toggleactive db error", "func", "SetCronjobStatus", "name", cj.Name, "err", err)
+				c.String(500, err.Error())
+				return
+			}
 		}
-		c.Redirect(302, config.Host+"jobs")
-	})
-	app.GET("/setinactive", func(c *gin.Context) {
-		aname := c.DefaultQuery("name", "")
-		cj, exists := CronJobNames[aname]
-		if !exists {
-			logger.Errorw("/setinactive with non-existing name error", "name", aname)
-			c.String(500, "ERROR: Name doesnt exist!")
-			return
-		}
-		//logic to set cronjob inactive
-		cr.Remove(cron.EntryID(cj.EntryId))
-		//delete(CronJobNames, cj.Name)
-		//save to db that its active again
-		err := Db.SetCronjobStatus(aname, false)
-		if err != nil {
-			logger.Errorw("/setinactive db error", "func", "SetCronjobInactive", "name", aname, "err", err)
-			c.String(500, err.Error())
-			return
-		}
-		c.Redirect(302, config.Host+"jobs")
+		c.String(200, "OK")
 	})
 
 	donetime := time.Now()

@@ -21,9 +21,11 @@ for(let i=0;i<els.length;i++){
     el.addEventListener("click",function(ev){
     
         ev.preventDefault();
-        let conf = confirm("Really delete?")
-        if (!conf) {
-            return;
+        if (this.getAttribute("verify")) {
+            let conf = confirm("Really delete?")
+            if (!conf) {
+                return;
+            }
         }
         ProvenceSendRequest(this.getAttribute("url"),{"name": this.name},function(s,t){
             location.reload();
