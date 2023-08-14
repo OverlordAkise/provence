@@ -37,7 +37,7 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 	if cj.EntryId != 0 {
 		logger.Infow("AddCronjob, replacing cronjob", "id", cj.EntryId, "name", cj.Name)
 		c.Remove(cron.EntryID(cj.EntryId))
-		delete(CronJobNames, cj.Name)
+		CronJobNames.Delete(cj.Name)
 	}
 	eid, err := c.AddFunc(cj.Schedule, func() {
 		defer func() {
@@ -69,7 +69,7 @@ func AddCronjobStruct(cj structs.CronJob, c *cron.Cron, shouldSaveToDb bool) err
 	}
 	id := int(eid)
 	cj.EntryId = id
-	CronJobNames[cj.Name] = cj
+	CronJobNames.Store(cj.Name, cj)
 	if shouldSaveToDb {
 		err = Db.AddCronjob(cj)
 		if err != nil {
@@ -86,13 +86,14 @@ func DeleteCronjob(cj structs.CronJob, c *cron.Cron) error {
 		return err
 	}
 	name := cj.Name
-	eid, eidExists := CronJobNames[name]
+	ieid, eidExists := CronJobNames.Load(name)
+	eid := ieid.(structs.CronJob)
 	if !eidExists {
 		return fmt.Errorf("Cronjob for deletion not found in CronJobNames! Impossible to delete!")
 	}
 	c.Remove(cron.EntryID(eid.EntryId))
-	delete(CronJobNames, name)
-	delete(CronJobLogLast, name)
+	CronJobNames.Delete(name)
+	CronJobLogLast.Delete(name)
 	logger.Infow("cronjob deleted", "name", name, "id", eid.EntryId)
 	return nil
 }
@@ -108,7 +109,7 @@ func AddCronjobLog(success bool, name, output, errStr string, timeTaken time.Dur
 	if err != nil {
 		logger.Errorw("add cronjoblog error", "name", name, "err", err)
 	}
-	CronJobLogLast[name] = cjl
+	CronJobLogLast.Store(name, cjl)
 }
 
 func GetCronjobLog(name string) {
@@ -117,15 +118,18 @@ func GetCronjobLog(name string) {
 		logger.Errorw("get cronjoblog error", "name", name, "err", err)
 		return
 	}
-	CronJobLogLast[name] = cjl
+	CronJobLogLast.Store(name, cjl)
 }
 
 func NotifyUsers(cjo structs.CronJob, errstr string, isError bool) {
 	//If notifygroup changed we get the correct cache here
-	cj, cjExists := CronJobNames[cjo.Name]
+	var cj structs.CronJob
+	icj, cjExists := CronJobNames.Load(cjo.Name)
 	if !cjExists {
 		logger.Warnw("couldnt get cronjob from CronJobNames", "name", cjo.Name)
 		cj = cjo
+	} else {
+		cj = icj.(structs.CronJob)
 	}
 	ng, err := Db.GetNotifyGroup(cj.NotifyGroup)
 	if err != nil {
@@ -141,28 +145,34 @@ func NotifyUsers(cjo structs.CronJob, errstr string, isError bool) {
 	tag := "[error]"
 	infoMsg := ""
 	shouldNotify := false
+	icjfs, cerr := CronJobFails.Load(cj.Name)
+	var cjfs int = 0
+	if !cerr {
+		cjfs = icjfs.(int)
+	}
 
 	if !isError {
 		tag = "[info]"
-		if CronJobFails[cj.Name] > 0 {
+		if cjfs > 0 {
 			tag = "[info] Recovered"
 			shouldNotify = true
 		}
 		if cj.AlwaysNotify {
 			shouldNotify = true
 		}
-		CronJobFails[cj.Name] = 0
+		CronJobFails.Store(cj.Name, 0)
 	} else {
-		CronJobFails[cj.Name] += 1
-		if cj.FailsNeeded <= CronJobFails[cj.Name] {
-			if CronJobFails[cj.Name] == 1 || CronJobFails[cj.Name]%cj.RepeatNotifEvery == 0 {
+		CronJobFails.Store(cj.Name, cjfs+1)
+		cjfs += 1
+		if cj.FailsNeeded <= cjfs {
+			if cjfs == 1 || cjfs%cj.RepeatNotifEvery == 0 {
 				shouldNotify = true
 			}
 		}
 	}
 
 	if !shouldNotify {
-		logger.Infow("not notifying", "name", cj.Name, "failcount", CronJobFails[cj.Name])
+		logger.Infow("not notifying", "name", cj.Name, "failcount", cjfs)
 		return
 	}
 
@@ -229,9 +239,9 @@ func RequestLogger() gin.HandlerFunc {
 var logger *zap.SugaredLogger
 
 // Caches
-var CronJobLogLast = make(map[string]structs.CronJobLog)
-var CronJobNames = make(map[string]structs.CronJob)
-var CronJobFails = make(map[string]int)
+var CronJobLogLast sync.Map // = make(map[string]structs.CronJobLog)
+var CronJobNames sync.Map   // = make(map[string]structs.CronJob)
+var CronJobFails sync.Map   // = make(map[string]int)
 var config structs.Config
 var httpclient = http.Client{}
 
@@ -279,7 +289,7 @@ func main() {
 		if cj.Active {
 			AddCronjobStruct(cj, cr, false)
 		} else {
-			CronJobNames[cj.Name] = cj
+			CronJobNames.Store(cj.Name, cj)
 		}
 		GetCronjobLog(cj.Name)
 	}
@@ -393,8 +403,9 @@ func main() {
 	app.GET("/home", func(c *gin.Context) {
 		overview := make(map[string][]structs.Overview)
 		//only show active cronjobs, so we use CronJobNames here
-		for _, cj := range CronJobNames {
-			ll, exists := CronJobLogLast[cj.Name]
+		CronJobNames.Range(func(key, icj any) bool {
+			cj := icj.(structs.CronJob)
+			ill, exists := CronJobLogLast.Load(cj.Name)
 			a := structs.Overview{}
 			a.Name = cj.Name
 			a.Group = cj.Group
@@ -402,12 +413,14 @@ func main() {
 			a.Found = false
 			a.Success = false
 			if exists {
+				ll := ill.(structs.CronJobLog)
 				a.Found = true
 				a.Success = ll.Success
 				a.Err = ll.Err
 			}
 			overview[cj.Group] = append(overview[cj.Group], a)
-		}
+			return true
+		})
 		c.HTML(200, "home", gin.H{
 			"Title":    "Provence | Home",
 			"Overview": overview,
@@ -609,14 +622,15 @@ func main() {
 				return
 			}
 		} else {
-			cj, exists := CronJobNames[cj.Name]
+			icj, exists := CronJobNames.Load(cj.Name)
 			if !exists {
 				logger.Errorw("/toggleactive with non-existing name error", "name", cj.Name)
 				c.String(500, "ERROR: Name doesnt exist!")
 				return
 			}
-			cr.Remove(cron.EntryID(cj.EntryId))
-			err = Db.SetCronjobStatus(cj, false)
+			loadedCJ := icj.(structs.CronJob)
+			cr.Remove(cron.EntryID(loadedCJ.EntryId))
+			err = Db.SetCronjobStatus(loadedCJ, false)
 			if err != nil {
 				logger.Errorw("/toggleactive db error", "func", "SetCronjobStatus", "name", cj.Name, "err", err)
 				c.String(500, err.Error())
