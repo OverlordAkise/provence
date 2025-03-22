@@ -1,7 +1,7 @@
 package database
 
 import (
-	"fmt"
+	// "fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	structs "luctus.at/provence/structs"
@@ -23,7 +23,6 @@ func Init(conString string) {
 	db.MustExec("CREATE TABLE IF NOT EXISTS cronjob(id SERIAL, active BOOL, schedule VARCHAR(16), bash LONGTEXT, name VARCHAR(255) UNIQUE, grp VARCHAR(255), description TEXT, severity VARCHAR(255), failsneeded INT, repeatnotifevery INT, alwaysnotify BOOL, notifygroup VARCHAR(255), created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);")
 	db.MustExec("CREATE TABLE IF NOT EXISTS notifygroup(id SERIAL, name VARCHAR(255) UNIQUE, gotifyurl VARCHAR(255), gotifykey VARCHAR(100), emailaddresses TEXT, webhookurl TEXT, shouldemail BOOL, shouldgotify BOOL, shouldwebhook BOOL);")
 	db.MustExec("CREATE TABLE IF NOT EXISTS cronjoblog(id SERIAL, created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, success BOOL, name VARCHAR(255), timetaken BIGINT, output LONGTEXT, err LONGTEXT);")
-	fmt.Println("DB Init done")
 }
 
 func GetAllCronjobs() ([]structs.CronJob, error) {

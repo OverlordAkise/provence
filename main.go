@@ -277,7 +277,6 @@ func main() {
 		panic(err)
 	}
 	defer logger.Sync()
-	fmt.Println("logger setup")
 
 	//CronJobs
 	cr := cron.New()
@@ -294,7 +293,7 @@ func main() {
 		GetCronjobLog(cj.Name)
 	}
 	cr.Start()
-	fmt.Println("started cron")
+	logger.Info("started cron")
 
 	//Webserver
 	gin.SetMode(gin.ReleaseMode)
@@ -642,6 +641,9 @@ func main() {
 
 	donetime := time.Now()
 	logger.Infow("provence started", "time", donetime.Sub(starttime), "port", config.Listenport, "host", config.Host)
-	fmt.Println("Now Listening", config.Listenport, config.Host)
-	fmt.Println(app.Run(":" + config.Listenport))
+    logger.Infow("Now listening", "port", config.Listenport, "host", config.Host)
+	err = app.Run(":" + config.Listenport)
+    if err != nil {
+        logger.Errorw("gin.Run error", "err", err)
+    }
 }
