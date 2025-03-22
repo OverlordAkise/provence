@@ -641,9 +641,9 @@ func main() {
 
 	donetime := time.Now()
 	logger.Infow("provence started", "time", donetime.Sub(starttime), "port", config.Listenport, "host", config.Host)
-    logger.Infow("Now listening", "port", config.Listenport, "host", config.Host)
+	logger.Infow("Now listening", "port", config.Listenport, "host", config.Host)
 	err = app.Run(":" + config.Listenport)
-    if err != nil {
-        logger.Errorw("gin.Run error", "err", err)
-    }
+	if err != nil {
+		logger.Errorw("gin.Run error", "err", err)
+	}
 }
